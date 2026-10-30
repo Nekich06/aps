@@ -1,0 +1,132 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+title Диаграмма классов: Бизнес-домен "Доставка котировок" (Вариант 21)
+hide empty members
+
+enum UpdateRequestStatus {
+  WAITING
+  PROCESSING
+  DONE
+  CANCELED
+}
+
+class QuotesDelivery {
+  - stats : Statistics
+  - server : Server
+  - requestSrc : RequestSource
+  - updateStatistics() : void
+  + setup(nodesNum : int, bufferCapacity : int) : void
+  + start() : void
+  + stop() : void
+}
+
+class RequestSource {
+  - generationLaw : PuassonLaw
+  + generateRequests() : QuoteUpdateRequest
+}
+
+class PuassonLaw {
+  - seed : double
+  + getNextInterval() : double
+}
+
+class ExponentialLaw {
+  - seed : double
+  + getNextInterval() : double
+}
+
+class QuoteUpdateRequest {
+  - toUpdateInfo : Info
+  - status : QuoteStatus
+  - queueTime : double
+  + getInfo() : Info
+  + updateStatus(actualStatus : QuoteStatus) : void
+}
+
+class Info {
+  - id : int
+  - actualPrice : double
+  - timestamp : double
+  + getId() : int
+  + getActualPrice() : double
+  + getTimestamp() : double
+}
+
+class Dispatcher {
+  - buffer : RingBuffer
+  + setupRingBuffer(bufferCapacity : int) : void
+  + enqueue(request : QuoteUpdateRequest) : void
+  + dequeue() : QuoteUpdateRequest
+}
+
+class Quote {
+  + id : int
+  + name : String
+  + currentPrice : double
+  + updatedTimestamp : double
+}
+
+class Server {
+  - nodes : Array<ComputeNode>
+  - dispatcher : Dispatcher
+  + launch(nodesNum : int) : void
+}
+
+class RingBuffer {
+  - capacity : int
+  - currentIndex : int
+  - storage : List<QuoteUpdateRequest>
+  + pushRequest(request : QuoteUpdateRequest) : void
+  + popRequest() : QuoteUpdateRequest
+  + removeOldest() : void
+  + isFull() : boolean
+}
+
+class ComputeNode {
+  - priority : int
+  - processingLaw : ExponentialLaw
+  + proccessRequest(request : QuoteUpdateRequest) : Info
+  + updateQuote(info : Info, market : Market) : void
+  + getPriority() : int
+  + isFree() : boolean
+}
+
+class Market {
+  - quotesTable : Array<Quote>
+  + updatePrice(id : int, actualPrice : double) : void
+}
+
+class Statistics {
+  - avgQueueTime : double
+  - rejectionProbability : double
+  - streamIntensity : double
+  - avgBufSize : double
+  - time : double
+  + displayGraphics() : void
+  + displayStepByStepDiagram() : void
+}
+
+QuotesDelivery *-- RequestSource
+QuotesDelivery *-- Statistics
+QuotesDelivery *-- Server
+
+Server "1" --> "1" Dispatcher
+Server "1" --> "*" ComputeNode
+Dispatcher "1" --> "1" RingBuffer
+RingBuffer "1" --> "*" QuoteUpdateRequest
+
+ComputeNode --> ExponentialLaw
+RequestSource --> PuassonLaw
+
+QuoteUpdateRequest --> UpdateRequestStatus
+
+Market "1" --> "*" Quote
+
+RequestSource "1" ..> "*" QuoteUpdateRequest : создаёт
+Dispatcher "1" ..> "*" QuoteUpdateRequest : ставит в очередь и следит за статусом до обработки
+ComputeNode "*" ..> "*" QuoteUpdateRequest : обрабатывает
+ComputeNode "1" ..> "*" Info : создаёт
+ComputeNode "1" ..> "1" Market : обращается, чтобы обновить информацию
+
+@enduml

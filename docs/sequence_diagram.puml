@@ -1,0 +1,113 @@
+@startuml
+skinparam sequenceMessageAlign center
+title Сиквенс-диаграмма: Бизнес-домен "Доставка котировок" (Вариант 21)
+
+actor "Трейдер" as Trader
+participant "QuotesDelivery" as QD
+participant "RequestSource" as RS
+participant "PuassonLaw" as PL
+participant "Dispatcher" as Disp
+participant "RingBuffer" as RB
+participant "Server" as Srv
+participant "ComputeNode" as CN
+participant "ExponentialLaw" as EL
+participant "Market" as Mkt
+participant "Quote" as Q
+participant "Statistics" as Stat
+
+== Инициализация системы ==
+Trader -> QD : start()
+QD -> QD : setup(nodesNum, bufferCapacity)
+QD -> Srv : launch(nodesNum)
+Srv -> Disp : setupRingBuffer(bufferCapacity)
+Disp -> RB : создать кольцевой буфер
+RB --> Disp : буфер создан
+Srv -> Srv : создать узлы ComputeNode
+loop Для каждого узла
+  Srv -> CN : создать с приоритетом
+  CN -> EL : инициализация закона распределения
+end
+Srv --> QD : сервер запущен
+QD --> Trader : система готова к работе
+
+== Генерация потока запросов (бесконечный поток) ==
+loop Пока система работает
+  QD -> RS : generateRequests()
+  RS -> PL : getNextInterval()
+  PL --> RS : интервал (пуассоновское распределение)
+  RS -> RS : создать QuoteUpdateRequest\n(вид инструмента, цена, timestamp)
+  RS -> Disp : enqueue(request)
+
+  == Постановка в кольцевой буфер (Д10З1) ==
+  Disp -> RB : pushRequest(request)
+  alt Буфер не заполнен
+    RB -> RB : currentIndex = (currentIndex + 1) mod capacity
+    RB -> RB : storage[currentIndex] = request
+    RB --> Disp : запрос помещён
+    Disp -> Disp : request.updateStatus(WAITING)
+  else Буфер заполнен (переполнение)
+    == Дисциплина отказа Д10О3: удаление самого старого ==
+    RB -> RB : removeOldest()
+    RB -> RB : currentIndex = (currentIndex + 1) mod capacity
+    RB -> RB : storage[currentIndex] = request
+    RB --> Disp : старый запрос удалён, новый помещён
+    Disp -> Disp : updateStatistics()\n(инкремент отказов)
+  end
+  Disp --> RS : запрос обработан диспетчером
+end
+
+== Выбор прибора и обработка (Д2П1, Д2Б3) ==
+loop Пока есть свободные узлы и запросы в буфере
+  Srv -> Srv : найти свободный ComputeNode\nс максимальным приоритетом
+  Srv -> CN : isFree()?
+  CN --> Srv : true
+
+  == Д2П1: выбор прибора по приоритету ==
+  Srv -> CN : назначить обработку
+
+  == Д2Б3: выбор заявки из буфера по кольцу ==
+  CN -> Disp : dequeue()
+  Disp -> RB : popRequest()
+  RB -> RB : взять запрос по кольцевому принципу
+  RB --> Disp : QuoteUpdateRequest
+  Disp --> CN : request
+  Disp -> Disp : request.updateStatus(PROCESSING)
+
+  == Обработка запроса (П31) ==
+  CN -> EL : getNextInterval()
+  EL --> CN : время обработки (экспоненциальное распределение)
+  CN -> CN : proccessRequest(request)
+  CN -> CN : извлечь Info\n(id, actualPrice, timestamp)
+
+  == Обновление данных в Market ==
+  CN -> Mkt : updatePrice(id, actualPrice)
+  Mkt -> Q : найти котировку по id
+  Q -> Q : currentPrice = actualPrice
+  Q -> Q : updatedTimestamp = timestamp
+  Mkt --> CN : котировка обновлена
+
+  CN -> Disp : request.updateStatus(DONE)
+  CN -> Stat : updateStatistics()\n(время в очереди, интенсивность)
+  CN -> CN : освободиться
+  CN --> Srv : обработка завершена
+end
+
+== Отображение результатов (ОР2, ОД3) ==
+Trader -> QD : запрос результатов
+QD -> Stat : displayGraphics()
+Stat --> Trader : графики:\n- среднее время в очереди\n- вероятность отказа\n- интенсивность потока
+
+Trader -> QD : запрос пошагового режима
+QD -> Stat : displayStepByStepDiagram()
+Stat -> RB : получить состояние очереди
+Stat -> Srv : получить состояние узлов
+Stat --> Trader : временная диаграмма:\n- занятость очереди\n- обрабатываемые данные
+
+== Остановка системы ==
+Trader -> QD : stop()
+QD -> Srv : остановить сервер
+Srv -> CN : завершить обработку
+QD -> Stat : финализировать статистику
+QD --> Trader : система остановлена
+
+@enduml
