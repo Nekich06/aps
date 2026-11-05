@@ -5,14 +5,10 @@ title Сиквенс-диаграмма: Бизнес-домен "Доставк
 actor "Трейдер" as Trader
 participant "QuotesDelivery" as QD
 participant "RequestSource" as RS
-participant "PuassonLaw" as PL
 participant "Dispatcher" as Disp
 participant "RingBuffer" as RB
 participant "Server" as Srv
 participant "ComputeNode" as CN
-participant "ExponentialLaw" as EL
-participant "Market" as Mkt
-participant "Quote" as Q
 participant "Statistics" as Stat
 
 == Инициализация системы ==
@@ -25,7 +21,6 @@ RB --> Disp : буфер создан
 Srv -> Srv : создать узлы ComputeNode
 loop Для каждого узла
   Srv -> CN : создать с приоритетом
-  CN -> EL : инициализация закона распределения
 end
 Srv --> QD : сервер запущен
 QD --> Trader : система готова к работе
@@ -33,8 +28,7 @@ QD --> Trader : система готова к работе
 == Генерация потока запросов (бесконечный поток) ==
 loop Пока система работает
   QD -> RS : generateRequests()
-  RS -> PL : getNextInterval()
-  PL --> RS : интервал (пуассоновское распределение)
+  RS -> RS : getNextInterval() [Пуассоновское распределение]
   RS -> RS : создать QuoteUpdateRequest\n(вид инструмента, цена, timestamp)
   RS -> Disp : enqueue(request)
 
@@ -74,17 +68,9 @@ loop Пока есть свободные узлы и запросы в буфе
   Disp -> Disp : request.updateStatus(PROCESSING)
 
   == Обработка запроса (П31) ==
-  CN -> EL : getNextInterval()
-  EL --> CN : время обработки (экспоненциальное распределение)
+  CN -> CN : getNextInterval() [Экспоненциальное распределение]
   CN -> CN : proccessRequest(request)
   CN -> CN : извлечь Info\n(id, actualPrice, timestamp)
-
-  == Обновление данных в Market ==
-  CN -> Mkt : updatePrice(id, actualPrice)
-  Mkt -> Q : найти котировку по id
-  Q -> Q : currentPrice = actualPrice
-  Q -> Q : updatedTimestamp = timestamp
-  Mkt --> CN : котировка обновлена
 
   CN -> Disp : request.updateStatus(DONE)
   CN -> Stat : updateStatistics()\n(время в очереди, интенсивность)

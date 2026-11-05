@@ -9,7 +9,7 @@ title Flowchart: Бизнес-домен "Доставка котировок" (
 |Источник (ИБ, ИЗ1)|
 start
 :Инициализация генератора\nпуассоновского потока;
-:Генерация интервала\nмежду запросами\n(PuassonLaw.getNextInterval());
+:Генерация интервала\nмежду запросами\n(this.getNextInterval());
 :Создание QuoteUpdateRequest\n(вид инструмента, цена, timestamp);
 :Передача запроса\nв Диспетчер;
 
@@ -43,10 +43,10 @@ else (Да)
   :Извлечение запроса\nиз RingBuffer\n(popRequest());
   :Установка статуса\nrequest = PROCESSING;
   |Прибор (П31)|
-  :Генерация времени обработки\n(ExponentialLaw.getNextInterval());
+  :Генерация времени обработки\n(this.getNextInterval());
   :Обработка запроса\n(proccessRequest);
   :Извлечение Info\n(id, actualPrice, timestamp);
-  :Обновление котировки\nв Market.updatePrice();
+  :Обновление котировки\n;
   :Установка статуса\nrequest = DONE;
   :Освобождение ComputeNode;
 endif

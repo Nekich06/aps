@@ -22,18 +22,8 @@ class QuotesDelivery {
 }
 
 class RequestSource {
-  - generationLaw : PuassonLaw
+  - getNextInterval() : double
   + generateRequests() : QuoteUpdateRequest
-}
-
-class PuassonLaw {
-  - seed : double
-  + getNextInterval() : double
-}
-
-class ExponentialLaw {
-  - seed : double
-  + getNextInterval() : double
 }
 
 class QuoteUpdateRequest {
@@ -60,13 +50,6 @@ class Dispatcher {
   + dequeue() : QuoteUpdateRequest
 }
 
-class Quote {
-  + id : int
-  + name : String
-  + currentPrice : double
-  + updatedTimestamp : double
-}
-
 class Server {
   - nodes : Array<ComputeNode>
   - dispatcher : Dispatcher
@@ -85,16 +68,11 @@ class RingBuffer {
 
 class ComputeNode {
   - priority : int
-  - processingLaw : ExponentialLaw
+  - getNextInterval() : double
   + proccessRequest(request : QuoteUpdateRequest) : Info
-  + updateQuote(info : Info, market : Market) : void
+  + updateQuote(info : Info) : void
   + getPriority() : int
   + isFree() : boolean
-}
-
-class Market {
-  - quotesTable : Array<Quote>
-  + updatePrice(id : int, actualPrice : double) : void
 }
 
 class Statistics {
@@ -116,17 +94,11 @@ Server "1" --> "*" ComputeNode
 Dispatcher "1" --> "1" RingBuffer
 RingBuffer "1" --> "*" QuoteUpdateRequest
 
-ComputeNode --> ExponentialLaw
-RequestSource --> PuassonLaw
-
 QuoteUpdateRequest --> UpdateRequestStatus
-
-Market "1" --> "*" Quote
 
 RequestSource "1" ..> "*" QuoteUpdateRequest : создаёт
 Dispatcher "1" ..> "*" QuoteUpdateRequest : ставит в очередь и следит за статусом до обработки
 ComputeNode "*" ..> "*" QuoteUpdateRequest : обрабатывает
-ComputeNode "1" ..> "*" Info : создаёт
-ComputeNode "1" ..> "1" Market : обращается, чтобы обновить информацию
+ComputeNode "1" ..> "*" Info : создаёт и использует для обновления котировки
 
 @enduml
